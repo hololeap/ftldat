@@ -6,7 +6,7 @@ class FTLDat::DatFile < File
 
   Metadata = Struct.new :filename, :size, :offset do
     def data_offset
-      offset + 8 + filename.size
+      offset + 8 + filename.bytes.count
     end
   end
 
@@ -58,7 +58,7 @@ class FTLDat::DatFile < File
         # string.bytes.count returns number of bytes in string
         metadata << Metadata.new(p, data.bytes.count, pos)
 
-        [data.size, p.size].each {|i| write_long(i) }
+        [data.bytes.count, p.bytes.count].each {|i| write_long(i) }
         [p, data].each {|s| write(s) }
       end
 
