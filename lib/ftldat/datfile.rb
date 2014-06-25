@@ -13,7 +13,7 @@ class FTLDat::DatFile < File
   attr_reader :metadata
   def initialize(file)
     @index_size = 2048
-    super(file, File.exists?(file) ? 'r' : 'w')
+    super(file, File.exists?(file) ? 'rb' : 'wb')
   end
 
   def each
@@ -35,6 +35,8 @@ class FTLDat::DatFile < File
       FileUtils.mkpath File.dirname(file_path)
       File.write(file_path, data)
     end
+    
+    true
   end
 
   def pack(*paths)
@@ -44,14 +46,17 @@ class FTLDat::DatFile < File
     metadata = []
 
     begin 
-      reopen(path, 'w+')
+      close
+      reopen(path, 'wb')
       write_long(@index_size)
       @index_size.times { write_long(0) }
 
       Find.find(*paths) do |p|
         next if File.directory? p
         data = File.read(p)
-        metadata << Metadata.new(p, data.size, pos)
+
+        # string.bytes.count returns number of bytes in string
+        metadata << Metadata.new(p, data.bytes.count, pos)
 
         [data.size, p.size].each {|i| write_long(i) }
         [p, data].each {|s| write(s) }
@@ -60,18 +65,17 @@ class FTLDat::DatFile < File
       seek 4
       metadata.each {|m| write_long(m.offset) }
 
-      @metadata = metadata
       FileUtils.remove(tmp_file)
+      @metadata = metadata
 
     rescue Exception => e
       FileUtils.move(tmp_file, path)
       raise e
     ensure
-      reopen(path, 'r')
+      close
+      reopen(path, 'rb')
     end
-      
   end 
-
 
   private
 
@@ -82,7 +86,7 @@ class FTLDat::DatFile < File
     @index_size = read_long
     @index_size.times do
       offset = read_long
-      index << p(offset) unless offset == 0
+      index << offset unless offset == 0
     end
 
     index.map do |offset|
